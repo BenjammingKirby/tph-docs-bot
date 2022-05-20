@@ -1,18 +1,23 @@
-import { Permissions, Formatters, MessageButton } from "discord.js";
-import type { CommandInteraction, Snowflake, ButtonInteraction, Message } from "discord.js";
+import { Permissions, Formatters, MessageButton, Client } from "discord.js";
+import type { CommandInteraction, Snowflake, ButtonInteraction } from "discord.js";
 import type { Command, MyContext } from "../interfaces";
 
-export const deleteButton = (initiatorId: Snowflake) =>
+export const deleteButton = (initiatorId: Snowflake, messageId: Snowflake) =>
     new MessageButton()
-        .setCustomId("deletebtn/" + initiatorId)
+        .setCustomId("deletebtn/" + initiatorId + "/" + messageId)
         .setEmoji("🗑")
         .setStyle("SECONDARY");
 
 export const deleteButtonHandler = async (interaction: ButtonInteraction<"cached">) => {
-    const commandInitiatorId = interaction.customId.replace("deletebtn/", "");
+    const buttonIdSplit = interaction.customId.split("/");
+    const commandInitiatorId = buttonIdSplit[1];
+    interaction.customId.replace("deletebtn/", "");
+    const replyMessageId = buttonIdSplit[2];
     // If the button clicker is the command initiator
     if (interaction.user.id === commandInitiatorId) {
-        (interaction.message as Message).delete().catch(console.error);
+        await interaction.channel?.messages.delete(replyMessageId).catch(console.error);
+        await interaction.update({ components: [] }).catch(console.error);
+        // (interaction.message as Message).delete().catch(console.error);
     } else
         await interaction
             .reply({
@@ -29,10 +34,12 @@ export const deleteButtonHandler = async (interaction: ButtonInteraction<"cached
  */
 // * Note that as of writing, slash commands can override permissions
 export function commandPermissionCheck(interaction: CommandInteraction, command: Command["slashCommand"]): boolean {
-    const { client, user, channel } = interaction;
+    if (!command) return true;
+
+    const { user } = interaction;
     // If the channel is a dm
     // if it's a partial, channel.type wouldn't exist
-    if (channel.type === "DM" || !channel) {
+    if (!interaction.inGuild() || !interaction.channel) {
         if (command.guildOnly) {
             interaction.editReply("This is a guild exclusive command, not to be executed in a dm").catch(console.error);
             // For guild only commands that were executed in a dm, cancel the command
@@ -44,7 +51,10 @@ export function commandPermissionCheck(interaction: CommandInteraction, command:
     if (command.botPermissions) {
         const botPermissions = new Permissions(command.botPermissions);
         // The required permissions for the bot to run the command, missing in the channel.
-        const missingPermissions = channel.permissionsFor(client.user).missing(botPermissions);
+        const missingPermissions =
+            interaction.channel.permissionsFor((interaction.client as Client<true>).user)?.missing(botPermissions) ??
+            [];
+
         if (missingPermissions.length > 0) {
             interaction
                 .editReply(
@@ -59,7 +69,7 @@ export function commandPermissionCheck(interaction: CommandInteraction, command:
     if (command.authorPermissions) {
         const authorPermissions = new Permissions(command.authorPermissions);
         // The required permissions for the user to run the command, missing in the channel.
-        const missingPermissions = channel.permissionsFor(user.id).missing(authorPermissions);
+        const missingPermissions = interaction.channel.permissionsFor(user.id)?.missing(authorPermissions) ?? [];
         if (missingPermissions.length > 0) {
             interaction
                 .editReply(
@@ -74,9 +84,13 @@ export function commandPermissionCheck(interaction: CommandInteraction, command:
     // By default, allow execution;
     return false;
 }
-export function commandCooldownCheck(interaction: CommandInteraction, command: Command["slashCommand"], context: MyContext): boolean {
+export function commandCooldownCheck(
+    interaction: CommandInteraction,
+    command: Command["slashCommand"],
+    context: MyContext,
+): boolean {
     const { user } = interaction;
-    if (command.cooldown) {
+    if (command?.cooldown) {
         const id = user.id + "/" + interaction.commandName;
         const existingCooldown = context.cooldownCounter.get(id);
         if (existingCooldown) {

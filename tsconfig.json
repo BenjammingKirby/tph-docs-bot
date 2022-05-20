@@ -3,8 +3,8 @@
     "outDir": "dist",
     "noImplicitAny": false,
     "module": "commonjs",
-    "target": "es2017",
-    "lib": ["es7", "DOM"],
+    "target": "ES2022",
+    "lib": ["ES7", "DOM"],
     "moduleResolution": "node",
     "baseUrl": "./src",
     "sourceMap": false,
@@ -17,8 +17,10 @@
     "alwaysStrict": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "strict": true
   },
   "exclude": ["node_modules", "dist"],
   "include": ["src/**/*", "src/**/*.json"]
 }
+  

@@ -1,4 +1,4 @@
-import type { APIEmbed } from "discord-api-types";
+import type { APIEmbed } from "discord-api-types/v9";
 
 const limits = {
     title: 256,
@@ -22,19 +22,16 @@ export function checkEmbedLimits(embeds: APIEmbed[], error = false) {
     if (error) {
         const allCombinedEmbedCharacterCount = embeds.reduce(
             (prev, curr) => prev + getCombinedEmbedCharacterCount(curr),
-            0
+            0,
         );
         if (allCombinedEmbedCharacterCount > limits.allCombinedEmbed)
             throw new Error(
-                `There are more than ${limits.allCombinedEmbed} characters on all ${embeds.length} embeds combined`
+                `There are more than ${limits.allCombinedEmbed} characters on all ${embeds.length} embeds combined`,
             );
-        if (embeds.length > limits.maxEmbeds)
-            throw new Error(`There are more than ${limits.maxEmbeds} embeds`);
+        if (embeds.length > limits.maxEmbeds) throw new Error(`There are more than ${limits.maxEmbeds} embeds`);
         embeds.forEach((embed, index) => {
             if (getCombinedEmbedCharacterCount(embed) > limits.combinedEmbed)
-                throw new Error(
-                    `There are more than ${limits.combinedEmbed} combined characters on embed[${index}]`
-                );
+                throw new Error(`There are more than ${limits.combinedEmbed} combined characters on embed[${index}]`);
 
             const {
                 title = "",
@@ -45,49 +42,38 @@ export function checkEmbedLimits(embeds: APIEmbed[], error = false) {
             } = embed;
 
             if (fields.length > limits.fields)
-                throw new Error(
-                    `There are more than ${limits.fields} fields on embed[${index}]`
-                );
+                throw new Error(`There are more than ${limits.fields} fields on embed[${index}]`);
             if (title.length > limits.title)
-                throw new Error(
-                    `There are more than ${limits.title} characters on embed[${index}].title`
-                );
+                throw new Error(`There are more than ${limits.title} characters on embed[${index}].title`);
             if (description.length > limits.description)
-                throw new Error(
-                    `There are more than ${limits.description} characters on embed[${index}].description`
-                );
+                throw new Error(`There are more than ${limits.description} characters on embed[${index}].description`);
             if (text.length > limits.footerText)
-                throw new Error(
-                    `There are more than ${limits.footerText} characters on embed[${index}].footer.text`
-                );
+                throw new Error(`There are more than ${limits.footerText} characters on embed[${index}].footer.text`);
             if (name.length > limits.authorName)
-                throw new Error(
-                    `There are more than ${limits.authorName} characters on embed[${index}].author.name`
-                );
+                throw new Error(`There are more than ${limits.authorName} characters on embed[${index}].author.name`);
 
             fields.forEach((field, fieldIndex) => {
                 if (field.name.length > limits.fieldName)
                     throw new Error(
-                        `There are more than ${limits.fieldName} characters on embed[${index}].fields[${fieldIndex}].name`
+                        `There are more than ${limits.fieldName} characters on embed[${index}].fields[${fieldIndex}].name`,
                     );
                 if (field.value.length > limits.fieldValue)
                     throw new Error(
-                        `There are more than ${limits.fieldValue} characters on embed[${index}].fields[${fieldIndex}].value`
+                        `There are more than ${limits.fieldValue} characters on embed[${index}].fields[${fieldIndex}].value`,
                     );
             });
         });
     } else {
         const allCombinedEmbedCharacterCount = embeds.reduce(
             (prev, curr) => prev + getCombinedEmbedCharacterCount(curr),
-            0
+            0,
         );
         // Check the character count for all the combined embeds
         if (allCombinedEmbedCharacterCount > limits.allCombinedEmbed) return false;
         // Check the amount of embeds passed
         if (embeds.length > limits.maxEmbeds) return false;
         const allEmbeds = embeds.every((embed) => {
-            if (getCombinedEmbedCharacterCount(embed) > limits.combinedEmbed)
-                return false;
+            if (getCombinedEmbedCharacterCount(embed) > limits.combinedEmbed) return false;
 
             const {
                 title = "",
@@ -127,22 +113,10 @@ export function checkEmbedLimits(embeds: APIEmbed[], error = false) {
  * @returns The combined character count from the embed
  */
 export function getCombinedEmbedCharacterCount(embed: APIEmbed): number {
-    const {
-        title = "",
-        description = "",
-        footer: { text = "" } = {},
-        author: { name = "" } = {},
-        fields = [],
-    } = embed;
+    const { title = "", description = "", footer: { text = "" } = {}, author: { name = "" } = {}, fields = [] } = embed;
     const fieldsCharacterCount = fields.reduce((prev, curr) => {
         const { name = "", value = "" } = curr;
         return prev + name.length + value.length;
     }, 0);
-    return (
-        title.length +
-    description.length +
-    text.length +
-    name.length +
-    fieldsCharacterCount
-    );
+    return title.length + description.length + text.length + name.length + fieldsCharacterCount;
 }

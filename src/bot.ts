@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { Client, Collection, LimitedCollection } from "discord.js";
+import { Client, Collection, type Interaction, LimitedCollection, type Message } from "discord.js";
 import { MyContext } from "./interfaces";
 import { loadCommands, interactionCreateHandler } from "./handlers/InteractionCreateHandler";
 import { messageHandler } from "./handlers/MessageHandler";
@@ -28,6 +28,7 @@ import { deleteButtonHandler } from "./utils/CommandUtils";
                 // Disable every supported cache
                 return new LimitedCollection({ maxSize: 0 });
             },
+            allowedMentions: { parse: ["users"] },
         }),
         commands: {
             autocompletes: new Collection(),
@@ -49,8 +50,10 @@ import { deleteButtonHandler } from "./utils/CommandUtils";
         console.info(`Logged in as ${client.user.tag} (${client.user.id})`);
     });
 
-    docsBot.on("messageCreate", messageHandler);
-    docsBot.on("interactionCreate", interactionCreateHandler.bind(null, context));
+    docsBot.on("messageCreate", (message) => messageHandler(message as Message<true>));
+    docsBot.on("interactionCreate", (interaction) =>
+        interactionCreateHandler(context, interaction as Interaction<"cached">),
+    );
 
     docsBot.login(process.env.TOKEN);
 })();

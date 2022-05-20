@@ -4,7 +4,7 @@ import { MessageActionRow, MessageEmbed, MessageSelectMenu } from "discord.js";
 import { gunzipSync } from "zlib";
 import { XMLParser } from "fast-xml-parser";
 import { Command, MdnDoc } from "../../interfaces";
-import fetch from "node-fetch";
+import { request } from "undici";
 import flexsearch from "flexsearch";
 
 interface SitemapEntry<T extends string | number> {
@@ -14,9 +14,9 @@ interface SitemapEntry<T extends string | number> {
 type Sitemap<T extends string | number> = SitemapEntry<T>[];
 
 let sources = {
-    index: null as flexsearch.Index,
-    sitemap: null as Sitemap<number>,
-    lastUpdated: null as number,
+    index: null as unknown as flexsearch.Index,
+    sitemap: null as unknown as Sitemap<number>,
+    lastUpdated: null as unknown as number,
 };
 
 const MDN_BASE_URL = "https://developer.mozilla.org/en-US/docs/" as const;
@@ -34,10 +34,17 @@ const command: Command = {
                     .setDescription("Enter the phrase you'd like to search for. Example: Array.filter")
                     .setRequired(true)
                     .setAutocomplete(true),
+            )
+            .addUserOption((option) =>
+                option
+                    .setName("target")
+                    .setDescription("The user the documentation is intended to be sent for")
+                    .setRequired(false),
             ),
         async run(interaction) {
-            const deleteButtonRow = new MessageActionRow().addComponents([deleteButton(interaction.user.id)]);
-            const query = interaction.options.getString("query");
+            const query = interaction.options.getString("query")!;
+            const target = interaction.options.getUser("target");
+
             const { index, sitemap } = await getSources();
             // Get the top 25 results
             const search: string[] = index.search(query, { limit: 25 }).map((id) => sitemap[<number>id].loc);
@@ -57,12 +64,23 @@ const command: Command = {
                     await interaction.editReply({ content: "Couldn't find any results" }).catch(console.error);
                     return;
                 }
-                await interaction
-                    .editReply("Sent documentation for " + (query.length >= 100 ? query.slice(0, 100) + "..." : query))
-                    .catch(console.error);
-                await interaction
-                    .followUp({
+                const sentMessage = await interaction.channel
+                    ?.send({
+                        content: `Sent by <@${interaction.user.id}> ${target ? `for <@${target.id}>` : ""}`,
                         embeds: [resultEmbed],
+                    })
+                    .catch(console.error);
+                if (!sentMessage) {
+                    await interaction.editReply("There was an error trying to send the message").catch(console.error);
+                    return;
+                }
+                const deleteButtonRow = new MessageActionRow().addComponents([
+                    deleteButton(interaction.user.id, sentMessage.id),
+                ]);
+                await interaction
+                    .editReply({
+                        content:
+                            "Sent documentation for " + (query.length >= 100 ? query.slice(0, 100) + "..." : query),
                         components: [deleteButtonRow],
                     })
                     .catch(console.error);
@@ -72,7 +90,7 @@ const command: Command = {
                 // If there are multiple results, send a select menu from which the user can choose which one to send
                 const selectMenuRow = new MessageActionRow().addComponents(
                     new MessageSelectMenu()
-                        .setCustomId("mdnselect/" + interaction.user.id)
+                        .setCustomId("mdnselect/" + interaction.user.id + (target ? "/" + target.id : ""))
                         .addOptions(
                             search.map((val) => {
                                 const parsed = val.length >= 99 ? val.split("/").slice(-2).join("/") : val;
@@ -95,18 +113,31 @@ const command: Command = {
         {
             custom_id: "mdnselect",
             async run(interaction) {
-                const Initiator = interaction.customId.split("/")[1];
-                const deleteButtonRow = new MessageActionRow().addComponents([deleteButton(Initiator)]);
+                const [, Initiator, target] = interaction.customId.split("/");
                 const selectedValue = interaction.values[0];
                 const resultEmbed = await getSingleMDNSearchResults(selectedValue);
 
+                if (!resultEmbed) {
+                    await interaction.editReply({ content: "Couldn't find any results" }).catch(console.error);
+                    return;
+                }
+
+                // Send documentation
+                const sentMessage = await interaction.channel
+                    ?.send({
+                        content: `Sent by <@${Initiator}> ${target ? `for <@${target}>` : ""}`,
+                        embeds: [resultEmbed],
+                    })
+                    .catch(console.error);
+
+                if (!sentMessage) {
+                    await interaction.editReply("There was an error trying to send the message").catch(console.error);
+                    return;
+                }
+                const deleteButtonRow = new MessageActionRow().addComponents([deleteButton(Initiator, sentMessage.id)]);
                 // Remove the menu and update the ephemeral message
                 await interaction
-                    .editReply({ content: "Sent documentations for " + selectedValue, components: [] })
-                    .catch(console.error);
-                // Send documentation
-                await interaction
-                    .followUp({ embeds: [resultEmbed], components: [deleteButtonRow] })
+                    .editReply({ content: "Sent documentations for " + selectedValue, components: [deleteButtonRow] })
                     .catch(console.error);
             },
         },
@@ -138,10 +169,10 @@ export async function getSingleMDNSearchResults(searchQuery: string) {
     const secondSearch = index.search(searchQuery, { limit: 25 }).map((id) => sitemap[<number>id].loc);
     // Since it returns an array, the exact match might not be the first selection, if the exact match exists, fetch using that, if not get the first result
     const finalSelection = secondSearch.includes(searchQuery) ? searchQuery : secondSearch[0];
-    const res = await fetch(`${MDN_BASE_URL + finalSelection}/index.json`).catch(console.error);
-    if (!res || !res?.ok) return null;
-    const resJSON = await res.json?.().catch(console.error);
-    if (!res.json) return null;
+    const res = await request(`${MDN_BASE_URL + finalSelection}/index.json`).catch(console.error);
+    if (!res || res?.statusCode !== 200) return null;
+    const resJSON = await res.body.json?.().catch(console.error);
+    if (!resJSON) return null;
 
     const doc: MdnDoc = resJSON.doc;
 
@@ -157,9 +188,9 @@ export async function getSingleMDNSearchResults(searchQuery: string) {
 export async function getSources(): Promise<typeof sources> {
     if (sources.lastUpdated && Date.now() - sources.lastUpdated < 43200000 /* 12 hours */) return sources;
 
-    const res = await fetch("https://developer.mozilla.org/sitemaps/en-us/sitemap.xml.gz");
-    if (!res.ok) return sources; // Fallback to old sources if the new ones are not available for any reason
-    const parsedSitemap = new XMLParser().parse(gunzipSync(await res.buffer()).toString());
+    const res = await request("https://developer.mozilla.org/sitemaps/en-us/sitemap.xml.gz");
+    if (res.statusCode !== 200) return sources; // Fallback to old sources if the new ones are not available for any reason
+    const parsedSitemap = new XMLParser().parse(gunzipSync(await res.body.arrayBuffer()).toString());
     const sitemap: Sitemap<number> = parsedSitemap.urlset.url.map((entry: SitemapEntry<string>) => ({
         loc: entry.loc.slice(MDN_BASE_URL.length),
         lastmod: new Date(entry.lastmod).valueOf(),

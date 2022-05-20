@@ -1,7 +1,8 @@
 import "dotenv/config";
 import { REST } from "@discordjs/rest";
 import { Routes } from "discord-api-types/v9";
-import glob from "glob";
+import glob from "fast-glob";
+import { RESTPostAPIApplicationCommandsJSONBody } from "discord-api-types/v9";
 
 const {
     APPLICATIONID: applicationId,
@@ -16,13 +17,13 @@ const {
 } = process.env;
 
 // Check if the environment variables were provided
-if (!applicationId) throw new Error("Please make sure the bot's application ID is mentioned on \"APPLICATIONID\"");
+if (!applicationId) throw new Error("Please make sure the bot's application ID is mentioned on APPLICATIONID");
 if (!token) throw new Error("Please make sure you add a token");
 if (["GUILD", "RESET_GUILD"].includes(registerMode) && !guildId)
     throw new Error("The target's guild id is needed but was not provided");
 
-const commands = [];
-const commandFiles = glob.sync(`${__dirname}/../commands/**/*.js`);
+const commands: RESTPostAPIApplicationCommandsJSONBody[] = [];
+const commandFiles = glob.sync(`${__dirname}/../commands/**/*.js`.replace(/\\/g, "/"));
 const rest = new REST({ version: "9" }).setToken(token);
 
 (async function () {
@@ -39,7 +40,7 @@ const rest = new REST({ version: "9" }).setToken(token);
     );
     try {
         if (registerMode === "RESET_GUILD") {
-            await rest.put(Routes.applicationGuildCommands(applicationId, guildId), {
+            await rest.put(Routes.applicationGuildCommands(applicationId, guildId!), {
                 body: [],
             });
         } else if (registerMode === "RESET_GLOBAL") {
@@ -47,7 +48,7 @@ const rest = new REST({ version: "9" }).setToken(token);
                 body: [],
             });
         } else if (registerMode === "GUILD") {
-            await rest.put(Routes.applicationGuildCommands(applicationId, guildId), {
+            await rest.put(Routes.applicationGuildCommands(applicationId, guildId!), {
                 body: commands,
             });
         } else if (registerMode === "GLOBAL") {

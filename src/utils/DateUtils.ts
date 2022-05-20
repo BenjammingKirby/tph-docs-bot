@@ -6,7 +6,7 @@ const toSecondsConverterConstant = {
     second: 1,
 };
 type formats = keyof typeof toSecondsConverterConstant;
-export function intervalToDuration(start: number | Date, end: number | Date = Date.now()) {
+export function intervalToDuration(start: number | Date, end: number | Date = Date.now()): Record<formats, number> {
     const intervalObj = {
         month: 0,
         day: 0,

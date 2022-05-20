@@ -4,9 +4,9 @@ import Doc, { sources } from "discord.js-docs";
 import { checkEmbedLimits } from "../../utils/EmbedUtils";
 import { deleteButton } from "../../utils/CommandUtils";
 import { MessageActionRow, MessageSelectMenu } from "discord.js";
-import type { APIEmbed } from "discord-api-types";
+import type { APIEmbed } from "discord-api-types/v9";
 
-const supportedBranches = Object.keys(sources).map((branch) => [capitalize(branch), branch] as [string, string]);
+const supportedBranches = Object.keys(sources).map((branch) => ({ name: capitalize(branch), value: branch }));
 
 const command: Command = {
     slashCommand: {
@@ -28,7 +28,13 @@ const command: Command = {
                 option
                     .setName("source")
                     .setDescription("Select which branch/repository to get documentation off of (Default: stable)")
-                    .addChoices(supportedBranches)
+                    .addChoices(...supportedBranches)
+                    .setRequired(false),
+            )
+            .addUserOption((option) =>
+                option
+                    .setName("target")
+                    .setDescription("The user the documentation is intended to be sent for")
                     .setRequired(false),
             )
             .addBooleanOption((option) =>
@@ -38,17 +44,17 @@ const command: Command = {
                     .setRequired(false),
             ),
         async run(interaction) {
-            const deleteButtonRow = new MessageActionRow().addComponents([deleteButton(interaction.user.id)]);
             const queryOption = interaction.options.getString("query");
             const sourceOption = interaction.options.getString("source") as keyof typeof sources;
+            const target = interaction.options.getUser("target")?.id;
 
             // Support the source:Query format
             let { Source: source = "stable", Query: query } =
-                queryOption.match(/(?:(?<Source>[^:]*):)?(?<Query>(?:.|\s)*)/i)?.groups ?? {};
+                queryOption?.match(/(?:(?<Source>[^:]*):)?(?<Query>(?:.|\s)*)/i)?.groups ?? {};
             // The Default source should be stable
             if (!sources[source]) source = "stable";
 
-            if (sourceOption) source = sourceOption;
+            if (sourceOption) source = sourceOption as string;
             // Whether to include private elements on the search results, by default false, shows private elements if the search returns an exact result;
             const searchPrivate = interaction.options.getBoolean("private") || false;
             const doc = await Doc.fetch(source, { force: true }).catch(console.error);
@@ -64,7 +70,7 @@ const command: Command = {
                 const notFoundEmbed = doc.baseEmbed();
                 notFoundEmbed.description = "Didn't find any results for that query";
 
-                const timeStampDate = new Date(notFoundEmbed.timestamp);
+                const timeStampDate = new Date(notFoundEmbed.timestamp ?? Date.now());
                 // Satisfies the method's MessageEmbedOption type
                 const embedObj = { ...notFoundEmbed, timestamp: timeStampDate };
 
@@ -75,7 +81,7 @@ const command: Command = {
 
                 const selectMenuRow = new MessageActionRow().addComponents(
                     new MessageSelectMenu()
-                        .setCustomId(`djsselect/${source}/${searchPrivate}/${interaction.user.id}`)
+                        .setCustomId(`djsselect/${source}/${searchPrivate}/${interaction.user.id}/${target}`)
                         .addOptions(result)
                         .setPlaceholder("Select documentation to send"),
                 );
@@ -88,19 +94,33 @@ const command: Command = {
                 return;
             }
             const resultEmbed = result;
-            const timeStampDate = new Date(resultEmbed.timestamp);
+            const timeStampDate = new Date(resultEmbed.timestamp ?? Date.now());
             const embedObj = { ...resultEmbed, timestamp: timeStampDate };
 
             //! "checkEmbedLimits" does not support MessageEmbed objects due to the properties being null by default, use a raw embed object for this method
             // Check if the embed exceeds any of the limits
             if (!checkEmbedLimits([resultEmbed])) {
                 // The final field should be the View Source button
-                embedObj.fields = [embedObj.fields?.at(-1)];
+                embedObj.fields = [embedObj.fields!.at(-1)!];
             }
+            const sentMessage = await interaction.channel
+                ?.send({
+                    content: `Sent by <@${interaction.user.id}>  ${target ? `for <@${target}>` : ""}`,
+                    embeds: [embedObj],
+                })
+                .catch(console.error);
+            if (!sentMessage) {
+                await interaction.editReply("There was an error trying to send the message").catch(console.error);
+                return;
+            }
+            const deleteButtonRow = new MessageActionRow().addComponents([
+                deleteButton(interaction.user.id, sentMessage.id),
+            ]);
+
             await interaction.editReply({
                 content: "Sent documentations for " + (query.length >= 100 ? query.slice(0, 100) + "..." : query),
+                components: [deleteButtonRow],
             });
-            await interaction.followUp({ embeds: [embedObj], components: [deleteButtonRow] }).catch(console.error);
             return;
         },
     },
@@ -109,20 +129,31 @@ const command: Command = {
             custom_id: "djsselect",
             async run(interaction) {
                 const selectedValue = interaction.values[0];
-                const [, source, searchPrivate, Initiator] = interaction.customId.split("/");
-                const deleteButtonRow = new MessageActionRow().addComponents([deleteButton(Initiator)]);
+                const [, source, searchPrivate, Initiator, target] = interaction.customId.split("/");
 
                 const doc = await Doc.fetch(source, { force: true });
 
                 const resultEmbed = searchDJSDoc(doc, selectedValue, searchPrivate === "true") as APIEmbed;
 
+                if (!checkEmbedLimits([resultEmbed])) {
+                    // The final field should be the View Source button
+                    resultEmbed.fields = [resultEmbed.fields!.at(-1)!];
+                }
+                // Send documentation
+                const sentMessage = await interaction.channel
+                    ?.send({
+                        content: `Sent by <@${Initiator}>  ${target ? `for <@${target}>` : ""}`,
+                        embeds: [resultEmbed],
+                    })
+                    .catch(console.error);
+                if (!sentMessage) {
+                    await interaction.editReply("There was an error trying to send the message").catch(console.error);
+                    return;
+                }
+                const deleteButtonRow = new MessageActionRow().addComponents([deleteButton(Initiator, sentMessage.id)]);
                 // Remove the menu and update the ephemeral message
                 await interaction
-                    .editReply({ content: "Sent documentations for " + selectedValue, components: [] })
-                    .catch(console.error);
-                // Send documentation
-                await interaction
-                    .followUp({ embeds: [resultEmbed], components: [deleteButtonRow] })
+                    .editReply({ content: "Sent documentations for " + selectedValue, components: [deleteButtonRow] })
                     .catch(console.error);
             },
         },
@@ -143,7 +174,7 @@ const command: Command = {
                     await interaction
                         .respond([
                             {
-                                name: singleElement.formattedName,
+                                name: singleElement.formattedName!,
                                 value: branchOrProject + ":" + singleElement.formattedName,
                             },
                         ])
@@ -158,7 +189,7 @@ const command: Command = {
                 await interaction
                     .respond(
                         searchResults.map((elem) => ({
-                            name: elem.formattedName,
+                            name: elem.formattedName!,
                             value: branchOrProject + ":" + elem.formattedName,
                         })),
                     )
@@ -192,10 +223,10 @@ export function searchDJSDoc(doc: Doc, query: string, searchPrivate?: boolean) {
         // Labels and values have a limit of 100 characters
         const description = parsedDescription.length >= 99 ? parsedDescription.slice(0, 96) + "..." : parsedDescription;
         return {
-            label: res.formattedName,
-            description,
-            emoji: resolveRegionalEmoji(res.embedPrefix),
-            value: res.formattedName,
+            label: res.formattedName!,
+            description: description ?? "description not available",
+            emoji: resolveRegionalEmoji(res.embedPrefix!) ?? undefined,
+            value: res.formattedName!,
         };
     });
 }

@@ -4,7 +4,7 @@ import { intervalToDuration, intervalObjToStr } from "../utils/DateUtils";
 
 export async function messageHandler(message: Message<true>) {
     try {
-        const clientUser = message.client.user;
+        const clientUser = message.client.user!;
         // The regex for the bot's mention
         const mentionRegex = new RegExp(`^<@!?${clientUser.id}>$`);
 
@@ -13,7 +13,7 @@ export async function messageHandler(message: Message<true>) {
             const pkgJSON = await import(pkgJSONPath);
             const { version, description, dependencies } = pkgJSON;
 
-            const uptime = intervalToDuration(Date.now() - message.client.uptime, Date.now());
+            const uptime = intervalToDuration(Date.now() - (message.client.uptime ?? 0), Date.now());
             const statusEmbed = new MessageEmbed()
                 .setTitle(`${clientUser.username} (v${version})`)
                 .setURL("https://github.com/the-programmers-hangout/tph-docs-bot/")

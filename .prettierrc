@@ -3,7 +3,6 @@
   "useTabs": false,
   "endOfLine": "lf",
   "semi": true,
-  "singleQuote": false,
   "arrowParens": "always",
   "trailingComma": "all",
   "bracketSpacing": true,

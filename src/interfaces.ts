@@ -6,16 +6,16 @@ import type {
     ButtonInteraction,
     SelectMenuInteraction,
     AutocompleteInteraction,
-    ApplicationCommandOptionChoice,
+    ApplicationCommandOptionChoiceData,
 } from "discord.js";
 import type { SlashCommandBuilder, SlashCommandSubcommandsOnlyBuilder } from "@discordjs/builders";
 type SlashCommandOptionsType = ReturnType<SlashCommandBuilder["addChannelOption"]>;
 export interface MyContext {
     client: Client;
     commands: {
-        autocompletes: Collection<string, Command["autocomplete"][number]>;
-        buttons: Collection<string, Command["buttons"][number]>;
-        selectMenus: Collection<string, Command["selectMenus"][number]>;
+        autocompletes: Collection<string, Exclude<Command["autocomplete"], undefined>[number]>;
+        buttons: Collection<string, Exclude<Command["buttons"], undefined>[number]>;
+        selectMenus: Collection<string, Exclude<Command["selectMenus"], undefined>[number]>;
         slashCommands: Collection<string, Command["slashCommand"]>;
     };
     cooldownCounter: Collection<string, number>;
@@ -39,7 +39,7 @@ export interface Command {
         focusedOption: string;
         run(
             interaction: AutocompleteInteraction<"cached">,
-            focusedOption: ApplicationCommandOptionChoice,
+            focusedOption: ApplicationCommandOptionChoiceData,
             context: MyContext,
         ): Promise<void>;
     }[];

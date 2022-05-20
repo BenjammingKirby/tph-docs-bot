@@ -1,8 +1,8 @@
-FROM node:17-alpine3.14
+FROM node:18-alpine3.14
 RUN apk add --update git
 WORKDIR /usr/app
 COPY package*.json ./
-RUN npm install
+RUN npm install --omit=dev
 COPY . .
 RUN npm run tsc
 WORKDIR /usr/app/dist

@@ -1,5 +1,5 @@
 import { commandCooldownCheck, commandPermissionCheck } from "../utils/CommandUtils";
-import glob from "glob";
+import glob from "fast-glob";
 import type { Command, MyContext } from "../interfaces";
 import type {
     AutocompleteInteraction,
@@ -29,36 +29,30 @@ export async function interactionCreateHandler(context: MyContext, interaction: 
  * @param context
  * @returns
  */
-export function loadCommands(context: MyContext) {
-    // Promisifies the process of glob
-    return new Promise((resolve) => {
-        // Find all js files
-        glob(`${__dirname}/../commands/**/*.js`, async (err, files) => {
-            await Promise.all(
-                files.map(async (file) => {
-                    const { default: myCommandFile }: { default: Command } = await import(file).catch((err) => {
-                        console.error(err);
-                        // Since the return value gets destructured, an empty object is returned
-                        return {};
-                    });
-                    if (!myCommandFile) return;
-                    const { autocomplete, buttons, selectMenus, slashCommand } = myCommandFile;
-                    autocomplete?.forEach((autocom) =>
-                        context.commands.autocompletes.set(
-                            myCommandFile.slashCommand?.data.name + "/" + autocom.focusedOption,
-                            autocom,
-                        ),
-                    );
-                    buttons?.forEach((button) => context.commands.buttons.set(button.custom_id, button));
-                    selectMenus?.forEach((selectMenu) =>
-                        context.commands.selectMenus.set(selectMenu.custom_id, selectMenu),
-                    );
-                    slashCommand && context.commands.slashCommands.set(slashCommand.data.name, slashCommand);
-                }),
+export async function loadCommands(context: MyContext) {
+    // Find all js files
+    const files = await glob(`${__dirname}/../commands/**/*.js`.replace(/\\/g, "/"));
+    await Promise.all(
+        files.map(async (file) => {
+            const { default: myCommandFile }: { default: Command } = await import(file).catch((err) => {
+                console.error(err);
+                // Since the return value gets destructured, an empty object is returned
+                return {};
+            });
+            if (!myCommandFile) return;
+            const { autocomplete, buttons, selectMenus, slashCommand } = myCommandFile;
+            autocomplete?.forEach((autocom) =>
+                context.commands.autocompletes.set(
+                    myCommandFile.slashCommand?.data.name + "/" + autocom.focusedOption,
+                    autocom,
+                ),
             );
-            resolve(undefined);
-        });
-    });
+            buttons?.forEach((button) => context.commands.buttons.set(button.custom_id, button));
+            selectMenus?.forEach((selectMenu) => context.commands.selectMenus.set(selectMenu.custom_id, selectMenu));
+            slashCommand && context.commands.slashCommands.set(slashCommand.data.name, slashCommand);
+        }),
+    );
+    return undefined;
 }
 async function commandInteractionHandler(context: MyContext, interaction: CommandInteraction) {
     await interaction.deferReply({ ephemeral: true }).catch(console.error);
