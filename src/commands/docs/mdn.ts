@@ -1,11 +1,11 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
 import { deleteButton } from "../../utils/CommandUtils";
-import { MessageActionRow, MessageEmbed, MessageSelectMenu } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, EmbedBuilder, StringSelectMenuBuilder } from "discord.js";
 import { gunzipSync } from "zlib";
 import { XMLParser } from "fast-xml-parser";
 import { Command, MdnDoc } from "../../interfaces";
 import { request } from "undici";
-import flexsearch from "flexsearch";
+import flexsearch, { Index } from "flexsearch";
 
 interface SitemapEntry<T extends string | number> {
     loc: string;
@@ -14,7 +14,7 @@ interface SitemapEntry<T extends string | number> {
 type Sitemap<T extends string | number> = SitemapEntry<T>[];
 
 let sources = {
-    index: null as unknown as flexsearch.Index,
+    index: null as unknown as Index<MdnDoc>,
     sitemap: null as unknown as Sitemap<number>,
     lastUpdated: null as unknown as number,
 };
@@ -47,8 +47,10 @@ const command: Command = {
 
             const { index, sitemap } = await getSources();
             // Get the top 25 results
-            const search: string[] = index.search(query, { limit: 25 }).map((id) => sitemap[<number>id].loc);
-            const embed = new MessageEmbed()
+            const search: string[] = (await index.search(query, { limit: 25 })).map(
+                (id) => sitemap[id as unknown as number].loc,
+            );
+            const embed = new EmbedBuilder()
                 .setColor(MDN_BLUE_COLOR)
                 .setAuthor({ name: "MDN Documentation", iconURL: MDN_ICON_URL })
                 .setTitle(`Search for: ${query.slice(0, 243)}`);
@@ -74,7 +76,7 @@ const command: Command = {
                     await interaction.editReply("There was an error trying to send the message").catch(console.error);
                     return;
                 }
-                const deleteButtonRow = new MessageActionRow().addComponents([
+                const deleteButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents([
                     deleteButton(interaction.user.id, sentMessage.id),
                 ]);
                 await interaction
@@ -88,8 +90,8 @@ const command: Command = {
                 return;
             } else {
                 // If there are multiple results, send a select menu from which the user can choose which one to send
-                const selectMenuRow = new MessageActionRow().addComponents(
-                    new MessageSelectMenu()
+                const selectMenuRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+                    new StringSelectMenuBuilder()
                         .setCustomId("mdnselect/" + interaction.user.id + (target ? "/" + target.id : ""))
                         .addOptions(
                             search.map((val) => {
@@ -134,7 +136,9 @@ const command: Command = {
                     await interaction.editReply("There was an error trying to send the message").catch(console.error);
                     return;
                 }
-                const deleteButtonRow = new MessageActionRow().addComponents([deleteButton(Initiator, sentMessage.id)]);
+                const deleteButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents([
+                    deleteButton(Initiator, sentMessage.id),
+                ]);
                 // Remove the menu and update the ephemeral message
                 await interaction
                     .editReply({ content: "Sent documentations for " + selectedValue, components: [deleteButtonRow] })
@@ -149,8 +153,8 @@ const command: Command = {
                 const query = focusedOption.value as string;
                 const { index, sitemap } = await getSources();
                 // The limit for autocomplete options is 25
-                const search = index.search(query, { limit: 25 }).map((id) => {
-                    const val = sitemap[<number>id].loc;
+                const search = (await index.search(query, { limit: 25 })).map((id) => {
+                    const val = sitemap[id as unknown as number].loc;
                     // Values and names have a limit of 100 characters
                     const parsed = val.length >= 99 ? val.split("/").slice(-2).join("/") : val;
                     return { name: parsed, value: parsed };
@@ -166,7 +170,9 @@ export async function getSingleMDNSearchResults(searchQuery: string) {
     // Search for the match once again
     const { index, sitemap } = await getSources();
     // Search one more time
-    const secondSearch = index.search(searchQuery, { limit: 25 }).map((id) => sitemap[<number>id].loc);
+    const secondSearch = (await index.search(searchQuery, { limit: 25 })).map(
+        (id) => sitemap[id as unknown as number].loc,
+    );
     // Since it returns an array, the exact match might not be the first selection, if the exact match exists, fetch using that, if not get the first result
     const finalSelection = secondSearch.includes(searchQuery) ? searchQuery : secondSearch[0];
     const res = await request(`${MDN_BASE_URL + finalSelection}/index.json`).catch(console.error);
@@ -176,7 +182,7 @@ export async function getSingleMDNSearchResults(searchQuery: string) {
 
     const doc: MdnDoc = resJSON.doc;
 
-    return new MessageEmbed()
+    return new EmbedBuilder()
         .setColor(MDN_BLUE_COLOR)
         .setAuthor({ name: "MDN Documentation", iconURL: MDN_ICON_URL })
         .setColor(0xffffff)
@@ -195,7 +201,7 @@ export async function getSources(): Promise<typeof sources> {
         loc: entry.loc.slice(MDN_BASE_URL.length),
         lastmod: new Date(entry.lastmod).valueOf(),
     }));
-    const index = new flexsearch.Index();
+    const index = flexsearch.create<MdnDoc>();
     sitemap.forEach((entry, idx) => index.add(idx, entry.loc));
 
     sources = { index, sitemap, lastUpdated: Date.now() };

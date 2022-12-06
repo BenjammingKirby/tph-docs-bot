@@ -3,7 +3,7 @@ import { SlashCommandBuilder } from "@discordjs/builders";
 import Doc, { sources } from "discord.js-docs";
 import { checkEmbedLimits } from "../../utils/EmbedUtils";
 import { deleteButton } from "../../utils/CommandUtils";
-import { MessageActionRow, MessageSelectMenu } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, StringSelectMenuBuilder } from "discord.js";
 import type { APIEmbed } from "discord-api-types/v9";
 
 const supportedBranches = Object.keys(sources).map((branch) => ({ name: capitalize(branch), value: branch }));
@@ -70,17 +70,17 @@ const command: Command = {
                 const notFoundEmbed = doc.baseEmbed();
                 notFoundEmbed.description = "Didn't find any results for that query";
 
-                const timeStampDate = new Date(notFoundEmbed.timestamp ?? Date.now());
                 // Satisfies the method's MessageEmbedOption type
-                const embedObj = { ...notFoundEmbed, timestamp: timeStampDate };
+                const timeStampDate = new Date(notFoundEmbed.timestamp ?? Date.now());
+                notFoundEmbed.timestamp = timeStampDate.toISOString();
 
-                await interaction.editReply({ embeds: [embedObj] }).catch(console.error);
+                await interaction.editReply({ embeds: [notFoundEmbed] }).catch(console.error);
                 return;
             } else if (Array.isArray(result)) {
                 // If there are multiple results, send a select menu from which the user can choose which one to send
 
-                const selectMenuRow = new MessageActionRow().addComponents(
-                    new MessageSelectMenu()
+                const selectMenuRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+                    new StringSelectMenuBuilder()
                         .setCustomId(`djsselect/${source}/${searchPrivate}/${interaction.user.id}/${target}`)
                         .addOptions(result)
                         .setPlaceholder("Select documentation to send"),
@@ -95,25 +95,25 @@ const command: Command = {
             }
             const resultEmbed = result;
             const timeStampDate = new Date(resultEmbed.timestamp ?? Date.now());
-            const embedObj = { ...resultEmbed, timestamp: timeStampDate };
+            resultEmbed.timestamp = timeStampDate.toISOString();
 
             //! "checkEmbedLimits" does not support MessageEmbed objects due to the properties being null by default, use a raw embed object for this method
             // Check if the embed exceeds any of the limits
             if (!checkEmbedLimits([resultEmbed])) {
                 // The final field should be the View Source button
-                embedObj.fields = [embedObj.fields!.at(-1)!];
+                resultEmbed.fields = [resultEmbed.fields!.at(-1)!];
             }
             const sentMessage = await interaction.channel
                 ?.send({
                     content: `Sent by <@${interaction.user.id}>  ${target ? `for <@${target}>` : ""}`,
-                    embeds: [embedObj],
+                    embeds: [resultEmbed],
                 })
                 .catch(console.error);
             if (!sentMessage) {
                 await interaction.editReply("There was an error trying to send the message").catch(console.error);
                 return;
             }
-            const deleteButtonRow = new MessageActionRow().addComponents([
+            const deleteButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents([
                 deleteButton(interaction.user.id, sentMessage.id),
             ]);
 
@@ -150,7 +150,9 @@ const command: Command = {
                     await interaction.editReply("There was an error trying to send the message").catch(console.error);
                     return;
                 }
-                const deleteButtonRow = new MessageActionRow().addComponents([deleteButton(Initiator, sentMessage.id)]);
+                const deleteButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents([
+                    deleteButton(Initiator, sentMessage.id),
+                ]);
                 // Remove the menu and update the ephemeral message
                 await interaction
                     .editReply({ content: "Sent documentations for " + selectedValue, components: [deleteButtonRow] })

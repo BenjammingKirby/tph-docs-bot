@@ -1,5 +1,14 @@
 import "dotenv/config";
-import { Client, Collection, type Interaction, LimitedCollection, type Message } from "discord.js";
+import {
+    Client,
+    Collection,
+    type Interaction,
+    LimitedCollection,
+    type Message,
+    IntentsBitField,
+    Partials,
+    ActivityType,
+} from "discord.js";
 import { MyContext } from "./interfaces";
 import { loadCommands, interactionCreateHandler } from "./handlers/InteractionCreateHandler";
 import { messageHandler } from "./handlers/MessageHandler";
@@ -8,13 +17,17 @@ import { deleteButtonHandler } from "./utils/CommandUtils";
 (async function () {
     const context: MyContext = {
         client: new Client({
-            intents: ["GUILDS", "GUILD_MESSAGES"],
+            intents: [
+                IntentsBitField.Flags.Guilds,
+                IntentsBitField.Flags.GuildMessages,
+                IntentsBitField.Flags.MessageContent,
+            ],
             presence: {
-                activities: [{ type: "PLAYING", name: "Read the docs" }],
+                activities: [{ type: ActivityType.Playing, name: "Read the docs" }],
                 status: "online",
             },
             // For DMs, a partial channel object is received, in order to receive dms, CHANNEL partials must be activated
-            partials: ["CHANNEL"],
+            partials: [Partials.Channel],
             makeCache: (manager) => {
                 //! Disabling these caches will break djs functionality
                 const unsupportedCaches = [

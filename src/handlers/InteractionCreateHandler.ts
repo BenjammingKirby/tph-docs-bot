@@ -4,18 +4,18 @@ import type { Command, MyContext } from "../interfaces";
 import type {
     AutocompleteInteraction,
     ButtonInteraction,
-    CommandInteraction,
+    ChatInputCommandInteraction,
     Interaction,
     SelectMenuInteraction,
 } from "discord.js";
 
 export async function interactionCreateHandler(context: MyContext, interaction: Interaction<"cached">) {
     try {
-        if (interaction.isCommand()) {
+        if (interaction.isChatInputCommand()) {
             await commandInteractionHandler(context, interaction);
         } else if (interaction.isButton()) {
             await buttonInteractionHandler(context, interaction);
-        } else if (interaction.isSelectMenu()) {
+        } else if (interaction.isStringSelectMenu()) {
             await selectMenuInteractionHandler(context, interaction);
         } else if (interaction.isAutocomplete()) {
             await autocompleteInteractionHandler(context, interaction);
@@ -54,7 +54,7 @@ export async function loadCommands(context: MyContext) {
     );
     return undefined;
 }
-async function commandInteractionHandler(context: MyContext, interaction: CommandInteraction) {
+async function commandInteractionHandler(context: MyContext, interaction: ChatInputCommandInteraction<"cached">) {
     await interaction.deferReply({ ephemeral: true }).catch(console.error);
     const command = context.commands.slashCommands.get(interaction.commandName);
     if (!command) return interaction.editReply({ content: "Command not found" }).catch(console.error);

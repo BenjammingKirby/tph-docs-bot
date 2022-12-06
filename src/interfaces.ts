@@ -1,12 +1,12 @@
 import type {
     Client,
-    CommandInteraction,
     Collection,
-    PermissionString,
+    PermissionsString,
     ButtonInteraction,
     SelectMenuInteraction,
     AutocompleteInteraction,
     ApplicationCommandOptionChoiceData,
+    ChatInputCommandInteraction,
 } from "discord.js";
 import type { SlashCommandBuilder, SlashCommandSubcommandsOnlyBuilder } from "@discordjs/builders";
 type SlashCommandOptionsType = ReturnType<SlashCommandBuilder["addChannelOption"]>;
@@ -25,10 +25,10 @@ export interface Command {
         data: SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder | SlashCommandOptionsType;
         cooldown?: number;
         // * Note that as of writing, slash commands use the permissions for @everyone
-        botPermissions?: PermissionString[];
-        authorPermissions?: PermissionString[];
+        botPermissions?: PermissionsString[];
+        authorPermissions?: PermissionsString[];
         guildOnly?: boolean;
-        run(interaction: CommandInteraction, context: MyContext): Promise<void>;
+        run(interaction: ChatInputCommandInteraction, context: MyContext): Promise<void>;
     };
     buttons?: { custom_id: string; run(interaction: ButtonInteraction<"cached">, context: MyContext): Promise<void> }[];
     selectMenus?: {

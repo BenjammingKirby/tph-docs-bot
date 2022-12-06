@@ -1,4 +1,4 @@
-import { Formatters, MessageEmbed } from "discord.js";
+import { EmbedBuilder, codeBlock } from "discord.js";
 import type { Message } from "discord.js";
 import { intervalToDuration, intervalObjToStr } from "../utils/DateUtils";
 
@@ -14,24 +14,34 @@ export async function messageHandler(message: Message<true>) {
             const { version, description, dependencies } = pkgJSON;
 
             const uptime = intervalToDuration(Date.now() - (message.client.uptime ?? 0), Date.now());
-            const statusEmbed = new MessageEmbed()
+            const statusEmbed = new EmbedBuilder()
                 .setTitle(`${clientUser.username} (v${version})`)
                 .setURL("https://github.com/the-programmers-hangout/tph-docs-bot/")
                 .setColor(0xd250c7)
                 .setDescription(description)
-                .setThumbnail(clientUser.displayAvatarURL({ dynamic: true, format: "png", size: 256 }))
-                .addField(
-                    "Currently Supported Docs",
-                    ["discord.js", "Javascript (mdn)"].map((str) => `\`${str}\``).join(", "),
-                )
-                .addField("Dependencies", Formatters.codeBlock("json", JSON.stringify(dependencies, undefined, 4)))
-                .addField("Uptime", `${intervalObjToStr(uptime)}` || "Just turned on")
-                .addField("Ping", message.client.ws.ping + "ms", true)
-                .addField("Source", "[Github](https://github.com/the-programmers-hangout/tph-docs-bot/)", true)
-                .addField(
-                    "Contributors",
-                    "[Link](https://github.com/the-programmers-hangout/tph-docs-bot/graphs/contributors)",
-                    true,
+                .setThumbnail(clientUser.displayAvatarURL({ extension: "png", size: 256 }))
+                .addFields(
+                    {
+                        name: "Currently Supported Docs",
+                        value: ["discord.js", "Javascript (mdn)"].map((str) => `\`${str}\``).join(", "),
+                    },
+
+                    {
+                        name: "Dependencies",
+                        value: codeBlock("json", JSON.stringify(dependencies, undefined, 4)),
+                    },
+                    { name: "Uptime", value: `${intervalObjToStr(uptime)}` || "Just turned on" },
+                    { name: "Ping", value: message.client.ws.ping + "ms", inline: true },
+                    {
+                        name: "Source",
+                        value: "[Github](https://github.com/the-programmers-hangout/tph-docs-bot/)",
+                        inline: true,
+                    },
+                    {
+                        name: "Contributors",
+                        value: "[Link](https://github.com/the-programmers-hangout/tph-docs-bot/graphs/contributors)",
+                        inline: true,
+                    },
                 );
 
             await message.reply({ embeds: [statusEmbed] });

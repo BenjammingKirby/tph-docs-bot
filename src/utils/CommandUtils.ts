@@ -1,12 +1,12 @@
-import { Permissions, Formatters, MessageButton, Client } from "discord.js";
+import { PermissionsBitField, Formatters, ButtonBuilder, Client, ButtonStyle } from "discord.js";
 import type { CommandInteraction, Snowflake, ButtonInteraction } from "discord.js";
 import type { Command, MyContext } from "../interfaces";
 
 export const deleteButton = (initiatorId: Snowflake, messageId: Snowflake) =>
-    new MessageButton()
+    new ButtonBuilder()
         .setCustomId("deletebtn/" + initiatorId + "/" + messageId)
         .setEmoji("🗑")
-        .setStyle("SECONDARY");
+        .setStyle(ButtonStyle.Secondary);
 
 export const deleteButtonHandler = async (interaction: ButtonInteraction<"cached">) => {
     const buttonIdSplit = interaction.customId.split("/");
@@ -49,7 +49,7 @@ export function commandPermissionCheck(interaction: CommandInteraction, command:
         return false;
     }
     if (command.botPermissions) {
-        const botPermissions = new Permissions(command.botPermissions);
+        const botPermissions = new PermissionsBitField(command.botPermissions);
         // The required permissions for the bot to run the command, missing in the channel.
         const missingPermissions =
             interaction.channel.permissionsFor((interaction.client as Client<true>).user)?.missing(botPermissions) ??
@@ -67,7 +67,7 @@ export function commandPermissionCheck(interaction: CommandInteraction, command:
         }
     }
     if (command.authorPermissions) {
-        const authorPermissions = new Permissions(command.authorPermissions);
+        const authorPermissions = new PermissionsBitField(command.authorPermissions);
         // The required permissions for the user to run the command, missing in the channel.
         const missingPermissions = interaction.channel.permissionsFor(user.id)?.missing(authorPermissions) ?? [];
         if (missingPermissions.length > 0) {
