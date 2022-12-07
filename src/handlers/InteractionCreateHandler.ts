@@ -6,7 +6,7 @@ import type {
     ButtonInteraction,
     ChatInputCommandInteraction,
     Interaction,
-    SelectMenuInteraction,
+    StringSelectMenuInteraction,
 } from "discord.js";
 
 export async function interactionCreateHandler(context: MyContext, interaction: Interaction<"cached">) {
@@ -16,7 +16,7 @@ export async function interactionCreateHandler(context: MyContext, interaction: 
         } else if (interaction.isButton()) {
             await buttonInteractionHandler(context, interaction);
         } else if (interaction.isStringSelectMenu()) {
-            await selectMenuInteractionHandler(context, interaction);
+            await stringSelectMenuInteractionHandler(context, interaction);
         } else if (interaction.isAutocomplete()) {
             await autocompleteInteractionHandler(context, interaction);
         }
@@ -83,7 +83,10 @@ async function buttonInteractionHandler(context: MyContext, interaction: ButtonI
         ephemeral: true,
     }).catch(console.error);
 }
-async function selectMenuInteractionHandler(context: MyContext, interaction: SelectMenuInteraction<"cached">) {
+async function stringSelectMenuInteractionHandler(
+    context: MyContext,
+    interaction: StringSelectMenuInteraction<"cached">,
+) {
     await interaction.deferUpdate().catch(console.error);
 
     const menuId = interaction.customId.split("/")[0];

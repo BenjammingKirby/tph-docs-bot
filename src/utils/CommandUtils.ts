@@ -1,5 +1,5 @@
-import { PermissionsBitField, Formatters, ButtonBuilder, Client, ButtonStyle } from "discord.js";
-import type { CommandInteraction, Snowflake, ButtonInteraction } from "discord.js";
+import { PermissionsBitField, time as formattersTime, ButtonBuilder, ButtonStyle } from "discord.js";
+import type { CommandInteraction, Snowflake, ButtonInteraction, Client } from "discord.js";
 import type { Command, MyContext } from "../interfaces";
 
 export const deleteButton = (initiatorId: Snowflake, messageId: Snowflake) =>
@@ -15,9 +15,12 @@ export const deleteButtonHandler = async (interaction: ButtonInteraction<"cached
     const replyMessageId = buttonIdSplit[2];
     // If the button clicker is the command initiator
     if (interaction.user.id === commandInitiatorId) {
+        // Delete the sent message
         await interaction.channel?.messages.delete(replyMessageId).catch(console.error);
-        await interaction.update({ components: [] }).catch(console.error);
-        // (interaction.message as Message).delete().catch(console.error);
+        // Defer the interaction, make it the first reply
+        await interaction.deferUpdate().catch(console.error);
+        // Delete the initial reply, the message that holds the delete button
+        await interaction.deleteReply().catch(console.error);
     } else
         await interaction
             .reply({
@@ -101,7 +104,7 @@ export function commandCooldownCheck(
             interaction
                 .editReply(
                     //TODO revert to using custom logic to send remaining time as the discord timestamp formatting isn't very descriptive
-                    `Please wait ${Formatters.time(existingCooldown, "R")} before using the command again`,
+                    `Please wait ${formattersTime(existingCooldown, "R")} before using the command again`,
                 )
                 .catch(console.error);
             return true;

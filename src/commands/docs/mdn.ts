@@ -1,11 +1,11 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
 import { deleteButton } from "../../utils/CommandUtils";
-import { ActionRowBuilder, ButtonBuilder, EmbedBuilder, StringSelectMenuBuilder } from "discord.js";
+import { ActionRowBuilder, type ButtonBuilder, EmbedBuilder, StringSelectMenuBuilder } from "discord.js";
 import { gunzipSync } from "zlib";
 import { XMLParser } from "fast-xml-parser";
-import { Command, MdnDoc } from "../../interfaces";
 import { request } from "undici";
-import flexsearch, { Index } from "flexsearch";
+import flexsearch, { type Index } from "flexsearch";
+import type { Command, MdnDoc } from "../../interfaces";
 
 interface SitemapEntry<T extends string | number> {
     loc: string;
